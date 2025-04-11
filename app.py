@@ -14,8 +14,8 @@ load_dotenv()
 # Initialize Flask app
 app = Flask(__name__)
 
-# xAI API endpoint (hypothetical, replace with actual endpoint from xAI docs)
-XAI_API_URL = "https://api.x.ai/v1/completions"  # Update with correct Grok 3 endpoint
+# xAI API endpoint
+XAI_API_URL = "https://api.x.ai/v1/completions"  # Confirm this from xAI docs
 
 def predict_box_score(historical_data, future_box_info):
     """Simulate a 1-5 satisfaction score for a future box using Grok 3."""
@@ -36,7 +36,7 @@ def predict_box_score(historical_data, future_box_info):
         **Inputs**:
         Historical Data: {historical_data}
         Future Box Info: {future_box_info}
-        Simulate the score by analyzing trends in past member reactions, product variety, retail value, brand reputation, category ratings, and surprise value. Return a satisfaction score on a 1-5 scale, with exactly two decimal places (e.g., 4.23). Return only the numerical score.
+        Simulate the score by analyzing trends in past member reactions, product variety, retail value, brand reputation, category ratings, and surprise value. Return a satisfaction score on a 1-5 scale, with exactly two decimal places (e.g., 4.23). Return only the numerical score (e.g., 4.23).
         """
 
         headers = {
@@ -45,11 +45,11 @@ def predict_box_score(historical_data, future_box_info):
         }
 
         payload = {
-            "model": "grok-3",  # Use "grok-3-mini" for faster responses if needed
+            "model": "grok-3",
             "prompt": prompt,
-            "temperature": 0,  # Deterministic output
+            "temperature": 0,
             "max_tokens": 50,
-            "seed": 42  # For reproducibility
+            "seed": 42
         }
 
         scores = []
@@ -57,27 +57,28 @@ def predict_box_score(historical_data, future_box_info):
             response = requests.post(XAI_API_URL, json=payload, headers=headers)
             response.raise_for_status()
             result = response.json()
-            score = result.get("choices", [{}])[0].get("text", "").strip()
-            logger.info(f"Run response: {score}")
+            score_text = result.get("choices", [{}])[0].get("text", "").strip()
+            logger.info(f"Run response: {score_text}")
 
-            if not score:
+            # Clean the response (remove <|separator|> and any trailing text)
+            score_cleaned = score_text.split('<|separator|>')[0].strip()  # Take only before <|separator|>
+            if not score_cleaned:
                 logger.error("Model returned an empty response")
                 raise ValueError("Model returned an empty response")
 
             try:
-                score_float = float(score)
+                score_float = float(score_cleaned)
                 if not (1 <= score_float <= 5):
                     raise ValueError("Score out of range")
                 scores.append(score_float)
             except ValueError as e:
-                logger.error(f"Invalid score format: {score}, error: {str(e)}")
-                raise ValueError(f"Invalid score format: {score}")
+                logger.error(f"Invalid score format: {score_cleaned}, error: {str(e)}")
+                raise ValueError(f"Invalid score format: {score_cleaned}")
 
         if not scores:
             logger.error("No valid scores collected")
             raise ValueError("No valid scores collected")
 
-        # Calculate average score
         avg_score = sum(scores) / len(scores)
         final_score = f"{avg_score:.2f}"
         logger.info(f"Averaged score: {final_score}")
